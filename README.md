@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # RepoSage 🦉
 
 > **Ask your codebase anything.** A developer-first, local RAG-powered Codebase Q&A engine.
