@@ -1,0 +1,7 @@
+setup.py
+reposage.egg-info/PKG-INFO
+reposage.egg-info/SOURCES.txt
+reposage.egg-info/dependency_links.txt
+reposage.egg-info/entry_points.txt
+reposage.egg-info/requires.txt
+reposage.egg-info/top_level.txt

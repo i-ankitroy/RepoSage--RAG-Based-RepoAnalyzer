@@ -1,0 +1,2 @@
+[console_scripts]
+reposage = backend.cli:cli_app
