@@ -149,3 +149,64 @@ class VectorStoreManager:
         collections = client.list_collections()
         return [c.name for c in collections]
 
+    @classmethod
+    def delete_file_chunks(cls, repo_name: str, relative_file_path: str) -> None:
+        """
+        Deletes all chunks associated with a specific file from the repository's collection.
+        """
+        client = cls.get_client()
+        collection_name = sanitize_collection_name(repo_name)
+        try:
+            collection = client.get_collection(name=collection_name)
+            collection.delete(where={"file": relative_file_path})
+        except Exception as e:
+            print(f"Error deleting chunks for file {relative_file_path} in collection {repo_name}: {e}")
+
+    @classmethod
+    def add_chunks_to_existing(cls, repo_name: str, chunks: List[Dict[str, Any]], embeddings: List[List[float]]) -> None:
+        """
+        Appends chunks to an existing ChromaDB collection using unique IDs.
+        """
+        client = cls.get_client()
+        collection_name = sanitize_collection_name(repo_name)
+        collection = client.get_collection(name=collection_name)
+        
+        import uuid
+        ids = [f"chunk_{uuid.uuid4().hex[:12]}" for _ in range(len(chunks))]
+        documents = [c["content"] for c in chunks]
+        metadatas = [c["metadata"] for c in chunks]
+        
+        batch_size = 500
+        for i in range(0, len(chunks), batch_size):
+            end_idx = min(i + batch_size, len(chunks))
+            collection.add(
+                ids=ids[i:end_idx],
+                embeddings=embeddings[i:end_idx],
+                documents=documents[i:end_idx],
+                metadatas=metadatas[i:end_idx]
+            )
+
+    @classmethod
+    def get_all_chunks(cls, repo_name: str) -> List[Dict[str, Any]]:
+        """
+        Retrieves all documents and metadatas from the ChromaDB collection to rebuild the BM25 index.
+        """
+        client = cls.get_client()
+        collection_name = sanitize_collection_name(repo_name)
+        try:
+            collection = client.get_collection(name=collection_name)
+            results = collection.get(include=["documents", "metadatas"])
+            chunks = []
+            if results and "documents" in results and results["documents"]:
+                for cid, doc, meta in zip(results["ids"], results["documents"], results["metadatas"]):
+                    chunks.append({
+                        "id": cid,
+                        "content": doc,
+                        "metadata": meta
+                    })
+            return chunks
+        except Exception as e:
+            print(f"Error fetching all chunks for {repo_name}: {e}")
+            return []
+
+

@@ -17,13 +17,16 @@ CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 CLONED_REPOS_DIR.mkdir(parents=True, exist_ok=True)
 
 # API keys and URLs
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 
 # LLM Provider settings
-# Default to Groq if key is present, otherwise fall back to Ollama
-if GROQ_API_KEY:
+# Default to NVIDIA if key is present, then Groq, otherwise fall back to Ollama
+if NVIDIA_API_KEY:
+    DEFAULT_LLM_PROVIDER = "nvidia"
+elif GROQ_API_KEY:
     DEFAULT_LLM_PROVIDER = "groq"
 else:
     DEFAULT_LLM_PROVIDER = "ollama"

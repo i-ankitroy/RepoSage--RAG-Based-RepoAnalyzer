@@ -15,6 +15,7 @@ class QueryRequest(BaseModel):
     repo: str = Field(..., description="Name of the indexed repository collection")
     question: str = Field(..., description="Natural language question about the codebase")
     top_k: int = Field(default=5, description="Number of source chunks to retrieve")
+    provider: Optional[str] = Field(default=None, description="Optional LLM provider override ('nvidia', 'groq', or 'ollama')")
 
 class Citation(BaseModel):
     file: str = Field(..., description="Relative file path in the repository")

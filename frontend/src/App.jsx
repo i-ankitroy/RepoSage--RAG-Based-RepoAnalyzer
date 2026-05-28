@@ -14,6 +14,7 @@ function App() {
   const [rightWidth, setRightWidth] = useState(420);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   const handleCitationClick = ({ file, start_line, end_line }) => {
     setActiveFile(file);
@@ -91,8 +92,8 @@ function App() {
 
       {/* Right Resize Divider handle */}
       <div 
-        className={`resize-handle ${rightCollapsed ? "collapsed" : ""}`} 
-        onMouseDown={rightCollapsed ? null : startResizeRight}
+        className={`resize-handle ${rightCollapsed || isMaximized ? "collapsed" : ""}`} 
+        onMouseDown={rightCollapsed || isMaximized ? null : startResizeRight}
       />
 
       {/* 3. Right Citations Panel: Code Viewer & Chunks Reference */}
@@ -105,6 +106,8 @@ function App() {
         onCollapse={() => setRightCollapsed(true)}
         isCollapsed={rightCollapsed}
         width={rightWidth}
+        isMaximized={isMaximized}
+        setIsMaximized={setIsMaximized}
       />
     </div>
   );

@@ -1,9 +1,24 @@
 import os
 import shutil
 import git
+import hashlib
 from pathlib import Path
 from typing import List, Union
 from backend.config import SUPPORTED_EXTENSIONS, IGNORE_DIRS, CLONED_REPOS_DIR
+
+def calculate_file_hash(file_path: Path) -> str:
+    """
+    Computes the SHA-256 hash of a file to check for modifications.
+    """
+    hasher = hashlib.sha256()
+    try:
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+    except Exception:
+        return ""
+
 
 def walk_directory(directory_path: Union[str, Path]) -> List[Path]:
     """

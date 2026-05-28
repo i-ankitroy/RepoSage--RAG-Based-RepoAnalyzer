@@ -2,7 +2,8 @@ import json
 import re
 import httpx
 from typing import Dict, Any, List
-from backend.config import GROQ_API_KEY, OLLAMA_URL, OLLAMA_MODEL, DEFAULT_LLM_PROVIDER
+import os
+from backend.config import NVIDIA_API_KEY, GROQ_API_KEY, OLLAMA_URL, OLLAMA_MODEL, DEFAULT_LLM_PROVIDER
 
 def parse_llm_json(content: str) -> Dict[str, Any]:
     """
@@ -63,8 +64,10 @@ class LLMClient:
     @classmethod
     def get_provider(cls) -> str:
         """
-        Returns the active provider based on availability of Groq API Key.
+        Returns the active provider based on availability of API Keys.
         """
+        if NVIDIA_API_KEY:
+            return "nvidia"
         if GROQ_API_KEY:
             return "groq"
         return "ollama"
@@ -72,17 +75,19 @@ class LLMClient:
     @classmethod
     def generate_completion(cls, messages: List[Dict[str, str]], provider: str = None) -> Dict[str, Any]:
         """
-        Generates completion from Groq or local Ollama.
+        Generates completion from NVIDIA, Groq or local Ollama.
         """
         active_provider = provider or cls.get_provider()
         
-        if active_provider == "groq":
-            return cls._generate_groq(messages)
+        if active_provider == "nvidia":
+            return cls._generate_nvidia(messages, allow_fallback=(provider is None))
+        elif active_provider == "groq":
+            return cls._generate_groq(messages, allow_fallback=(provider is None))
         else:
             return cls._generate_ollama(messages)
 
     @classmethod
-    def _generate_groq(cls, messages: List[Dict[str, str]], force_text_mode: bool = False) -> Dict[str, Any]:
+    def _generate_groq(cls, messages: List[Dict[str, str]], force_text_mode: bool = False, allow_fallback: bool = True) -> Dict[str, Any]:
         """
         Call Groq API using HTTP POST.
         Supports retrying in text-mode if JSON-validation mode fails.
@@ -116,7 +121,7 @@ class LLMClient:
                     error_code = res_json.get("error", {}).get("code", "")
                     if "json" in error_code or "validate" in error_code:
                         print("Groq JSON validation failed. Retrying in text-mode...")
-                        return cls._generate_groq(messages, force_text_mode=True)
+                        return cls._generate_groq(messages, force_text_mode=True, allow_fallback=allow_fallback)
                         
                 response.raise_for_status()
                 res_data = response.json()
@@ -134,12 +139,11 @@ class LLMClient:
             if not force_text_mode and ("json_validate_failed" in str(e) or "400" in str(e)):
                 print("Encountered 400 error in Groq. Retrying in text-mode...")
                 try:
-                    return cls._generate_groq(messages, force_text_mode=True)
+                    return cls._generate_groq(messages, force_text_mode=True, allow_fallback=allow_fallback)
                 except Exception as retry_err:
                     e = retry_err
             
-            # If the user explicitly configured a Groq API Key, raise the error directly
-            if GROQ_API_KEY:
+            if not allow_fallback:
                 error_msg = str(e)
                 if hasattr(e, "response") and e.response is not None:
                     try:
@@ -148,8 +152,21 @@ class LLMClient:
                         error_msg = f"{e.response.status_code} - {e.response.text}"
                 raise ConnectionError(f"Failed to communicate with Groq API. Error: {error_msg}")
             
-            print(f"Groq API error: {e}. Falling back to local Ollama if available...")
-            return cls._generate_ollama(messages)
+            # Fall back to local Ollama. If that also fails, raise the original Groq error.
+            print(f"Groq API error: {e}. Attempting fallback to local Ollama...")
+            try:
+                return cls._generate_ollama(messages)
+            except Exception as ollama_err:
+                error_msg = str(e)
+                if hasattr(e, "response") and e.response is not None:
+                    try:
+                        error_msg = f"{e.response.status_code} - {e.response.json()}"
+                    except Exception:
+                        error_msg = f"{e.response.status_code} - {e.response.text}"
+                raise ConnectionError(
+                    f"Failed to communicate with LLM provider. Groq API failed with: {error_msg}. "
+                    f"Local Ollama fallback also failed: {ollama_err}"
+                )
 
     @classmethod
     def _generate_ollama(cls, messages: List[Dict[str, str]]) -> Dict[str, Any]:
@@ -186,3 +203,255 @@ class LLMClient:
                 f"Failed to communicate with LLM provider. Groq is not configured or failed, "
                 f"and Ollama at {OLLAMA_URL} is unreachable. Error: {e}"
             )
+
+    @classmethod
+    def generate_completion_stream(cls, messages: List[Dict[str, str]], provider: str = None):
+        """
+        Generates streamed completion from NVIDIA, Groq or local Ollama.
+        """
+        active_provider = provider or cls.get_provider()
+        
+        if active_provider == "nvidia":
+            yield from cls._generate_nvidia_stream(messages, allow_fallback=(provider is None))
+        elif active_provider == "groq":
+            yield from cls._generate_groq_stream(messages, allow_fallback=(provider is None))
+        else:
+            yield from cls._generate_ollama_stream(messages)
+
+    @classmethod
+    def _generate_groq_stream(cls, messages: List[Dict[str, str]], allow_fallback: bool = True):
+        """
+        Streams completion from Groq API token-by-token.
+        """
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        model = "llama-3.1-8b-instant"
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.1,
+            "max_tokens": 2048,
+            "stream": True
+        }
+        
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                with client.stream("POST", url, headers=headers, json=payload) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if not line:
+                            continue
+                        if line.startswith("data: "):
+                            data_str = line[6:].strip()
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk_data = json.loads(data_str)
+                                delta = chunk_data["choices"][0]["delta"]
+                                if "content" in delta:
+                                    yield {"type": "token", "token": delta["content"]}
+                            except Exception:
+                                pass
+        except Exception as e:
+            if not allow_fallback:
+                error_msg = str(e)
+                if hasattr(e, "response") and e.response is not None:
+                    try:
+                        error_msg = f"{e.response.status_code} - {e.response.json()}"
+                    except Exception:
+                        error_msg = f"{e.response.status_code} - {e.response.text}"
+                raise ConnectionError(f"Failed to communicate with Groq API. Error: {error_msg}")
+
+            # Fall back to local Ollama. If that also fails, raise the original Groq error.
+            print(f"Groq API stream error: {e}. Attempting fallback to local Ollama stream...")
+            try:
+                yield from cls._generate_ollama_stream(messages)
+            except Exception as ollama_err:
+                error_msg = str(e)
+                if hasattr(e, "response") and e.response is not None:
+                    try:
+                        error_msg = f"{e.response.status_code} - {e.response.json()}"
+                    except Exception:
+                        error_msg = f"{e.response.status_code} - {e.response.text}"
+                raise ConnectionError(
+                    f"Failed to communicate with LLM provider. Groq API stream failed with: {error_msg}. "
+                    f"Local Ollama fallback also failed: {ollama_err}"
+                )
+
+    @classmethod
+    def _generate_ollama_stream(cls, messages: List[Dict[str, str]]):
+        """
+        Streams completion from local Ollama instance token-by-token.
+        """
+        url = f"{OLLAMA_URL}/api/chat"
+        payload = {
+            "model": OLLAMA_MODEL,
+            "messages": messages,
+            "stream": True,
+            "options": {
+                "temperature": 0.1
+            }
+        }
+        
+        try:
+            with httpx.Client(timeout=120.0) as client:
+                with client.stream("POST", url, json=payload) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if not line:
+                            continue
+                        try:
+                            chunk_data = json.loads(line)
+                            message = chunk_data.get("message", {})
+                            if "content" in message:
+                                yield {"type": "token", "token": message["content"]}
+                            if chunk_data.get("done", False):
+                                break
+                        except Exception:
+                            pass
+        except Exception as e:
+            raise ConnectionError(
+                f"Failed to communicate with LLM provider. NVIDIA or Groq is not configured or failed, "
+                f"and Ollama at {OLLAMA_URL} is unreachable. Error: {e}"
+            )
+
+    @classmethod
+    def _generate_nvidia(cls, messages: List[Dict[str, str]], force_text_mode: bool = False, allow_fallback: bool = True) -> Dict[str, Any]:
+        """
+        Call NVIDIA NIM API using HTTP POST.
+        Supports retrying in text-mode if JSON-validation fails.
+        """
+        url = "https://integrate.api.nvidia.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {NVIDIA_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        model = os.getenv("NVIDIA_MODEL", "openai/gpt-oss-120b")
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.1,
+            "max_tokens": 2048
+        }
+        
+        if not force_text_mode:
+            payload["response_format"] = {"type": "json_object"}
+            
+        try:
+            with httpx.Client(timeout=60.0) as client:
+                response = client.post(url, headers=headers, json=payload)
+                
+                # Check for JSON validation failure or other bad requests
+                if response.status_code == 400 and not force_text_mode:
+                    print("NVIDIA JSON validation failed. Retrying in text-mode...")
+                    return cls._generate_nvidia(messages, force_text_mode=True, allow_fallback=allow_fallback)
+                        
+                response.raise_for_status()
+                res_data = response.json()
+                
+                content = res_data["choices"][0]["message"]["content"]
+                parsed_response = parse_llm_json(content)
+                
+                return {
+                    "answer": parsed_response.get("answer", content),
+                    "citations": parsed_response.get("citations", []),
+                    "model": f"nvidia/{model}"
+                }
+        except Exception as e:
+            if not force_text_mode and ("json_validate_failed" in str(e) or "400" in str(e)):
+                print("Encountered error in NVIDIA. Retrying in text-mode...")
+                try:
+                    return cls._generate_nvidia(messages, force_text_mode=True, allow_fallback=allow_fallback)
+                except Exception as retry_err:
+                    e = retry_err
+                    
+            if not allow_fallback:
+                error_msg = str(e)
+                if hasattr(e, "response") and e.response is not None:
+                    try:
+                        error_msg = f"{e.response.status_code} - {e.response.json()}"
+                    except Exception:
+                        error_msg = f"{e.response.status_code} - {e.response.text}"
+                raise ConnectionError(f"Failed to communicate with NVIDIA API. Error: {error_msg}")
+            
+            print(f"NVIDIA API error: {e}. Attempting fallback to local Ollama...")
+            try:
+                return cls._generate_ollama(messages)
+            except Exception as ollama_err:
+                error_msg = str(e)
+                if hasattr(e, "response") and e.response is not None:
+                    try:
+                        error_msg = f"{e.response.status_code} - {e.response.json()}"
+                    except Exception:
+                        error_msg = f"{e.response.status_code} - {e.response.text}"
+                raise ConnectionError(
+                    f"Failed to communicate with LLM provider. NVIDIA API failed with: {error_msg}. "
+                    f"Local Ollama fallback also failed: {ollama_err}"
+                )
+
+    @classmethod
+    def _generate_nvidia_stream(cls, messages: List[Dict[str, str]], allow_fallback: bool = True):
+        """
+        Streams completion from NVIDIA NIM API token-by-token.
+        """
+        url = "https://integrate.api.nvidia.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {NVIDIA_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        model = os.getenv("NVIDIA_MODEL", "openai/gpt-oss-120b")
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.1,
+            "max_tokens": 2048,
+            "stream": True
+        }
+        
+        try:
+            with httpx.Client(timeout=60.0) as client:
+                with client.stream("POST", url, headers=headers, json=payload) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if not line:
+                            continue
+                        if line.startswith("data: "):
+                            data_str = line[6:].strip()
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk_data = json.loads(data_str)
+                                delta = chunk_data["choices"][0]["delta"]
+                                if "content" in delta:
+                                    yield {"type": "token", "token": delta["content"]}
+                            except Exception:
+                                pass
+        except Exception as e:
+            if not allow_fallback:
+                error_msg = str(e)
+                if hasattr(e, "response") and e.response is not None:
+                    try:
+                        error_msg = f"{e.response.status_code} - {e.response.json()}"
+                    except Exception:
+                        error_msg = f"{e.response.status_code} - {e.response.text}"
+                raise ConnectionError(f"Failed to communicate with NVIDIA API. Error: {error_msg}")
+
+            print(f"NVIDIA API stream error: {e}. Attempting fallback to local Ollama stream...")
+            try:
+                yield from cls._generate_ollama_stream(messages)
+            except Exception as ollama_err:
+                error_msg = str(e)
+                if hasattr(e, "response") and e.response is not None:
+                    try:
+                        error_msg = f"{e.response.status_code} - {e.response.json()}"
+                    except Exception:
+                        error_msg = f"{e.response.status_code} - {e.response.text}"
+                raise ConnectionError(
+                    f"Failed to communicate with LLM provider. NVIDIA API stream failed with: {error_msg}. "
+                    f"Local Ollama fallback also failed: {ollama_err}"
+                )

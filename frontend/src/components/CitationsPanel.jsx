@@ -13,7 +13,9 @@ export default function CitationsPanel({
   onCitationClick,
   onCollapse,
   isCollapsed,
-  width
+  width,
+  isMaximized,
+  setIsMaximized
 }) {
   const [activeTab, setActiveTab] = useState("viewer"); // "viewer" | "citations"
   const [fileContent, setFileContent] = useState("");
@@ -22,7 +24,6 @@ export default function CitationsPanel({
   const [fileError, setFileError] = useState("");
   
   // Toggles for expandable layout and word wrap
-  const [isMaximized, setIsMaximized] = useState(false);
   const [wordWrap, setWordWrap] = useState(false);
   
   const containerRef = useRef(null);
