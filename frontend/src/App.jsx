@@ -1,8 +1,8 @@
 import React, { useState } from "react";
+import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import ChatPanel from "./components/ChatPanel";
 import CitationsPanel from "./components/CitationsPanel";
-import { ChevronRight, ChevronLeft } from "lucide-react";
 
 function App() {
   const [selectedRepo, setSelectedRepo] = useState("");
@@ -15,6 +15,10 @@ function App() {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+
+  // Global app state
+  const [activeProvider, setActiveProvider] = useState("default");
+  const [responseModel, setResponseModel] = useState("");
 
   const handleCitationClick = ({ file, start_line, end_line }) => {
     setActiveFile(file);
@@ -55,60 +59,62 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* Floating Left Toggle Button (always mounted, transitioned via CSS) */}
-      <button 
-        className={`floating-toggle-btn left ${leftCollapsed ? "visible" : ""}`}
-        onClick={() => setLeftCollapsed(false)}
-        title="Show Sidebar"
-      >
-        <ChevronRight size={16} />
-      </button>
+      {/* Ambient Background Orbs */}
+      <div className="orb orb-1" />
+      <div className="orb orb-2" />
+      <div className="orb orb-3" />
 
-      {/* Floating Right Toggle Button (always mounted, transitioned via CSS) */}
-      <button 
-        className={`floating-toggle-btn right ${rightCollapsed ? "visible" : ""}`}
-        onClick={() => setRightCollapsed(false)}
-        title="Show Sources"
-      >
-        <ChevronLeft size={16} />
-      </button>
-
-      {/* 1. Left Sidebar: Indexer, Repos, File Tree */}
-      <Sidebar 
-        selectedRepo={selectedRepo} 
-        setSelectedRepo={setSelectedRepo} 
-        onFileSelect={handleFileSelect}
-        activeFile={activeFile}
-        onCollapse={() => setLeftCollapsed(true)}
-        isCollapsed={leftCollapsed}
+      {/* Universal Topbar */}
+      <Navbar 
+        leftCollapsed={leftCollapsed}
+        setLeftCollapsed={setLeftCollapsed}
+        rightCollapsed={rightCollapsed}
+        setRightCollapsed={setRightCollapsed}
+        activeProvider={activeProvider}
+        setActiveProvider={setActiveProvider}
+        responseModel={responseModel}
       />
 
-      {/* 2. Center Chat Panel: Message Thread & Question input */}
-      <ChatPanel 
-        selectedRepo={selectedRepo} 
-        onCitationClick={handleCitationClick}
-        setCitations={setCitations}
-      />
+      {/* Main Content Area */}
+      <div className="app-content-area">
+        {/* 1. Left Sidebar: Indexer, Repos, File Tree */}
+        <Sidebar 
+          selectedRepo={selectedRepo} 
+          setSelectedRepo={setSelectedRepo} 
+          onFileSelect={handleFileSelect}
+          activeFile={activeFile}
+          isCollapsed={leftCollapsed}
+        />
 
-      {/* Right Resize Divider handle */}
-      <div 
-        className={`resize-handle ${rightCollapsed || isMaximized ? "collapsed" : ""}`} 
-        onMouseDown={rightCollapsed || isMaximized ? null : startResizeRight}
-      />
+        {/* 2. Center Chat Panel: Message Thread & Question input */}
+        <ChatPanel 
+          selectedRepo={selectedRepo} 
+          onCitationClick={handleCitationClick}
+          setCitations={setCitations}
+          activeProvider={activeProvider}
+          setActiveProvider={setActiveProvider}
+          setResponseModel={setResponseModel}
+        />
 
-      {/* 3. Right Citations Panel: Code Viewer & Chunks Reference */}
-      <CitationsPanel 
-        selectedRepo={selectedRepo} 
-        activeFile={activeFile} 
-        activeLineRange={activeLineRange}
-        citations={citations}
-        onCitationClick={handleCitationClick}
-        onCollapse={() => setRightCollapsed(true)}
-        isCollapsed={rightCollapsed}
-        width={rightWidth}
-        isMaximized={isMaximized}
-        setIsMaximized={setIsMaximized}
-      />
+        {/* Right Resize Divider handle */}
+        <div 
+          className={`resize-handle ${rightCollapsed || isMaximized ? "collapsed" : ""}`} 
+          onMouseDown={rightCollapsed || isMaximized ? null : startResizeRight}
+        />
+
+        {/* 3. Right Citations Panel: Code Viewer & Chunks Reference */}
+        <CitationsPanel 
+          selectedRepo={selectedRepo} 
+          activeFile={activeFile} 
+          activeLineRange={activeLineRange}
+          citations={citations}
+          onCitationClick={handleCitationClick}
+          isCollapsed={rightCollapsed}
+          width={rightWidth}
+          isMaximized={isMaximized}
+          setIsMaximized={setIsMaximized}
+        />
+      </div>
     </div>
   );
 }

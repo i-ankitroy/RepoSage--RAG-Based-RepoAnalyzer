@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { 
   Folder, FolderOpen, FileCode, FileText, 
-  Plus, Trash2, Database, ChevronRight, ChevronLeft, ChevronDown, 
-  Loader2, GitBranch
+  Plus, Trash2, ChevronRight, ChevronLeft, ChevronDown, 
+  Loader2, GitBranch, Sparkles
 } from "lucide-react";
 import { api } from "../api/client";
 
@@ -118,9 +118,9 @@ export default function Sidebar({
     const ext = fileName.split(".").pop().toLowerCase();
     const codeExtensions = ["py", "js", "ts", "jsx", "tsx", "go", "java", "cpp", "cc", "rs", "json", "yaml", "yml", "toml"];
     if (codeExtensions.includes(ext)) {
-      return <FileCode size={16} className="text-teal" style={{ color: "var(--teal)" }} />;
+      return <FileCode size={15} style={{ color: "var(--accent)" }} />;
     }
-    return <FileText size={16} />;
+    return <FileText size={15} style={{ color: "var(--text-muted)" }} />;
   };
 
   // Recursive Tree Node Renderer
@@ -150,12 +150,12 @@ export default function Sidebar({
           style={{ paddingLeft: `${isDir ? 0 : 6}px` }}
         >
           {isDir && (
-            isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+            isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />
           )}
           {isDir ? (
             isExpanded ? 
-              <FolderOpen size={16} className="text-accent" style={{ color: "var(--accent)" }} /> : 
-              <Folder size={16} className="text-accent" style={{ color: "var(--accent)" }} />
+              <FolderOpen size={15} style={{ color: "var(--accent)" }} /> : 
+              <Folder size={15} style={{ color: "var(--gray)" }} />
           ) : (
             getFileIcon(node.name)
           )}
@@ -178,68 +178,54 @@ export default function Sidebar({
       className={`sidebar ${isCollapsed ? "collapsed" : ""}`} 
       style={isCollapsed ? { width: 0, minWidth: 0 } : null}
     >
-      {/* Sidebar Header */}
-      <div className="sidebar-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div className="logo">
-          <Database size={20} style={{ color: "var(--accent)" }} />
-          <span>RepoSage</span>
-        </div>
-        <button 
-          onClick={onCollapse} 
-          className="btn-delete"
-          style={{ padding: "4px", display: "flex", alignItems: "center" }}
-          title="Collapse Sidebar"
-        >
-          <ChevronLeft size={14} />
-        </button>
-      </div>
-
       {/* Indexer Panel */}
       <div className="index-section">
         <div className="section-title">Index New Repository</div>
-        <form onSubmit={handleIndex}>
-          <div className="input-group">
-            <input
-              type="text"
-              placeholder="Local path or Git HTTPS URL"
-              className="input-field"
-              value={pathOrUrl}
-              onChange={(e) => setPathOrUrl(e.target.value)}
-              disabled={isIndexing}
-            />
-            <input
-              type="text"
-              placeholder="Repo Name (optional)"
-              className="input-field"
-              value={customName}
-              onChange={(e) => setCustomName(e.target.value)}
-              disabled={isIndexing}
-            />
-          </div>
-          <button 
-            type="submit" 
-            className="btn-primary" 
-            style={{ width: "100%" }}
-            disabled={isIndexing || !pathOrUrl.trim()}
-          >
-            {isIndexing ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Indexing...
-              </>
-            ) : (
-              <>
-                <Plus size={16} />
-                Index Codebase
-              </>
-            )}
-          </button>
-        </form>
+        <div className="glass-card">
+          <form onSubmit={handleIndex}>
+            <div className="input-group">
+              <input
+                type="text"
+                placeholder="Local path or Git HTTPS URL"
+                className="input-field"
+                value={pathOrUrl}
+                onChange={(e) => setPathOrUrl(e.target.value)}
+                disabled={isIndexing}
+              />
+              <input
+                type="text"
+                placeholder="Repo Name (optional)"
+                className="input-field"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                disabled={isIndexing}
+              />
+            </div>
+            <button 
+              type="submit" 
+              className="btn-primary" 
+              style={{ width: "100%" }}
+              disabled={isIndexing || !pathOrUrl.trim()}
+            >
+              {isIndexing ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  Indexing...
+                </>
+              ) : (
+                <>
+                  <Plus size={15} />
+                  Index Codebase
+                </>
+              )}
+            </button>
+          </form>
+        </div>
 
         {isIndexing && (
           <div className="indexing-status-indicator">
             <div className="loader-spinner"></div>
-            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+            <span>
               {indexingStatus}
             </span>
           </div>
@@ -270,15 +256,15 @@ export default function Sidebar({
             title="Delete this repository index"
             disabled={isIndexing || !selectedRepo}
           >
-            <Trash2 size={16} />
+            <Trash2 size={15} />
           </button>
         </div>
       </div>
 
       {/* File Tree Viewer */}
       <div className="file-tree-section">
-        <div className="section-title" style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "12px" }}>
-          <GitBranch size={14} />
+        <div className="section-title" style={{ marginBottom: "10px" }}>
+          <GitBranch size={13} />
           Files
         </div>
         {fileTree ? (

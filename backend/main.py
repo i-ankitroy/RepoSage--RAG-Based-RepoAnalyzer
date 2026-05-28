@@ -244,7 +244,16 @@ def delete_repository(name: str):
             repo_path = Path(repo_path_str)
             if CLONED_REPOS_DIR in repo_path.parents and repo_path.exists():
                 import shutil
-                shutil.rmtree(repo_path)
+                import stat
+                
+                def remove_readonly(func, path, excinfo):
+                    try:
+                        os.chmod(path, stat.S_IWRITE)
+                        func(path)
+                    except Exception:
+                        pass
+                        
+                shutil.rmtree(repo_path, onerror=remove_readonly)
                 
         return {"status": "success", "message": f"Repository '{name}' deleted successfully."}
     except Exception as e:

@@ -80,7 +80,7 @@ export default function CitationsPanel({
     if (isLoadingFile) {
       return (
         <div className="citation-empty-state">
-          <Loader2 size={32} className="animate-spin" style={{ color: "var(--accent)" }} />
+          <Loader2 size={28} className="animate-spin" style={{ color: "var(--accent)" }} />
           <p>Loading file content...</p>
         </div>
       );
@@ -97,7 +97,7 @@ export default function CitationsPanel({
     if (!activeFile) {
       return (
         <div className="citation-empty-state">
-          <FileCode size={32} />
+          <FileCode size={28} style={{ color: "var(--text-muted)" }} />
           <p>Select a file in the sidebar or click a citation in the chat to view code.</p>
         </div>
       );
@@ -119,16 +119,16 @@ export default function CitationsPanel({
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <button
               onClick={() => setWordWrap(!wordWrap)}
-              className={`btn-delete`} 
+              className="btn-delete"
               style={{ 
                 padding: "3px 6px", 
-                fontSize: "0.75rem", 
+                fontSize: "0.72rem", 
                 display: "flex", 
                 alignItems: "center", 
                 gap: "4px",
-                borderColor: wordWrap ? "var(--teal)" : "var(--border-color)",
-                color: wordWrap ? "var(--teal)" : "var(--text-muted)",
-                backgroundColor: wordWrap ? "rgba(78, 205, 196, 0.05)" : "transparent"
+                borderColor: wordWrap ? "var(--accent)" : "var(--border-color)",
+                color: wordWrap ? "var(--accent)" : "var(--text-muted)",
+                backgroundColor: wordWrap ? "var(--accent-dim)" : "transparent"
               }}
               title="Toggle Word Wrap"
             >
@@ -174,46 +174,22 @@ export default function CitationsPanel({
         minWidth: isCollapsed ? 0 : (isMaximized ? "55vw" : width) 
       }}
     >
-      {/* Tab Selectors with Expand/Collapse buttons */}
-      <div className="citations-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          {/* Maximize/Minimize Toggle button */}
-          <button 
-            onClick={() => setIsMaximized(!isMaximized)} 
-            className="btn-delete"
-            style={{ padding: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}
-            title={isMaximized ? "Minimize Panel" : "Maximize Panel"}
-            disabled={activeTab !== "viewer"}
+      {/* Tab Selectors */}
+      <div className="citations-header" style={{ justifyContent: "center" }}>
+        <div className="citations-tabs">
+          <button
+            className={`citation-tab ${activeTab === "viewer" ? "active" : ""}`}
+            onClick={() => setActiveTab("viewer")}
           >
-            {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            <Code size={13} />
+            Code
           </button>
-          <div className="citations-title">Sources</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div className="citations-tabs">
-            <button
-              className={`citation-tab ${activeTab === "viewer" ? "active" : ""}`}
-              onClick={() => setActiveTab("viewer")}
-            >
-              <Code size={14} style={{ marginRight: "4px", verticalAlign: "middle" }} />
-              Code Viewer
-            </button>
-            <button
-              className={`citation-tab ${activeTab === "citations" ? "active" : ""}`}
-              onClick={() => setActiveTab("citations")}
-            >
-              <List size={14} style={{ marginRight: "4px", verticalAlign: "middle" }} />
-              References ({citations.length})
-            </button>
-          </div>
-          {/* Collapse Panel Button */}
-          <button 
-            onClick={onCollapse} 
-            className="btn-delete"
-            style={{ padding: "4px", display: "flex", alignItems: "center", justifyContent: "center" }}
-            title="Collapse Panel"
+          <button
+            className={`citation-tab ${activeTab === "citations" ? "active" : ""}`}
+            onClick={() => setActiveTab("citations")}
           >
-            <ChevronRight size={14} />
+            <List size={13} />
+            Refs ({citations.length})
           </button>
         </div>
       </div>
@@ -227,7 +203,7 @@ export default function CitationsPanel({
           <div className="citation-cards-list">
             {citations.length === 0 ? (
               <div className="citation-empty-state" style={{ marginTop: "40px" }}>
-                <CheckCircle size={32} />
+                <CheckCircle size={28} style={{ color: "var(--text-muted)" }} />
                 <p>No citation references available yet. Ask a question to load references.</p>
               </div>
             ) : (

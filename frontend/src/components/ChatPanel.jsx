@@ -1,15 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Terminal, Loader2, Cpu } from "lucide-react";
+import { Send, Loader2, Cpu, Sparkles } from "lucide-react";
 import { api } from "../api/client";
 
-export default function ChatPanel({ selectedRepo, onCitationClick, setCitations }) {
+export default function ChatPanel({ selectedRepo, onCitationClick, setCitations, activeProvider, setActiveProvider, setResponseModel }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [responseModel, setResponseModel] = useState("");
   const [showFailoverModal, setShowFailoverModal] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState("");
-  const [activeProvider, setActiveProvider] = useState("default"); // "default", "groq", "ollama"
   const [flatFiles, setFlatFiles] = useState([]);
   const messagesEndRef = useRef(null);
 
@@ -423,7 +421,7 @@ export default function ChatPanel({ selectedRepo, onCitationClick, setCitations 
             
             // 2.1 Handle horizontal rules (e.g. --- or ***)
             if (/^(?:---|\*\*\*|___)$/.test(trimmed)) {
-              return <hr key={lineIdx} style={{ margin: "16px 0", borderColor: "var(--border-color)", borderStyle: "solid", borderWidth: "1px 0 0 0" }} />;
+              return <hr key={lineIdx} />;
             }
             
             // 2.2 Handle headers (e.g. # Title, ## Title, ### Title)
@@ -447,7 +445,7 @@ export default function ChatPanel({ selectedRepo, onCitationClick, setCitations 
               const parsedContent = formatInlineElements(content);
               return (
                 <div key={lineIdx} style={{ paddingLeft: `${indent + 16}px`, marginBottom: "6px", display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ color: "var(--teal)", marginTop: "2px", fontSize: "1.1rem", lineHeight: "1" }}>•</span>
+                  <span style={{ color: "var(--accent)", marginTop: "2px", fontSize: "0.9rem", lineHeight: "1" }}>●</span>
                   <span>{parsedContent}</span>
                 </div>
               );
@@ -462,7 +460,7 @@ export default function ChatPanel({ selectedRepo, onCitationClick, setCitations 
               const parsedContent = formatInlineElements(content);
               return (
                 <div key={lineIdx} style={{ paddingLeft: `${indent + 16}px`, marginBottom: "6px", display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                  <span style={{ color: "var(--teal)", fontWeight: 600 }}>{num}.</span>
+                  <span style={{ color: "var(--accent)", fontWeight: 600, fontSize: "0.85rem" }}>{num}.</span>
                   <span>{parsedContent}</span>
                 </div>
               );
@@ -483,7 +481,7 @@ export default function ChatPanel({ selectedRepo, onCitationClick, setCitations 
             }
 
             return (
-              <p key={lineIdx} style={{ marginBottom: "6px", lineHeight: "1.5" }}>
+              <p key={lineIdx} style={{ marginBottom: "6px", lineHeight: "1.6" }}>
                 {formatInlineElements(cleanLine)}
               </p>
             );
@@ -502,43 +500,28 @@ export default function ChatPanel({ selectedRepo, onCitationClick, setCitations 
 
   return (
     <div className="main-panel">
-      {/* Header */}
-      <div className="chat-header">
-        <div className="chat-title" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span>{selectedRepo ? `Chat — ${selectedRepo}` : "Chat"}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <select
-            value={activeProvider}
-            onChange={(e) => {
-              setActiveProvider(e.target.value);
-              setResponseModel("");
-            }}
-            className="model-select"
-            title="Switch LLM Model Provider"
-          >
-            <option value="default">Default Cloud</option>
-            <option value="nvidia">NVIDIA (gpt-oss-120b)</option>
-            <option value="groq">Groq (Llama 3.1)</option>
-            <option value="ollama">Local Ollama</option>
-          </select>
-          
-          {responseModel && (
-            <div className="chat-model-info" style={{ margin: 0 }}>
-              <Cpu size={12} style={{ marginRight: "4px", verticalAlign: "middle" }} />
-              {responseModel}
+      {/* Messages */}
+      <div className="chat-messages">
+        {/* Repo Badge embedded at top of chat thread area */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px", flexShrink: 0 }}>
+          {selectedRepo ? (
+            <div className="navbar-repo-badge" style={{ backgroundColor: "rgba(10, 11, 16, 0.4)", backdropFilter: "blur(8px)" }}>
+              {selectedRepo}
+            </div>
+          ) : (
+            <div className="navbar-repo-badge empty" style={{ backgroundColor: "rgba(10, 11, 16, 0.4)", backdropFilter: "blur(8px)" }}>
+              No Repository Selected
             </div>
           )}
         </div>
-      </div>
-
-      {/* Messages */}
-      <div className="chat-messages">
+        
         {messages.length === 0 ? (
           <div className="chat-empty">
-            <Terminal size={40} />
+            <div className="chat-empty-icon">
+              <Sparkles size={28} style={{ color: "var(--accent)" }} />
+            </div>
             <h3>Ask anything about {selectedRepo || "your codebase"}</h3>
-            <p style={{ maxWidth: "340px", fontSize: "0.85rem" }}>
+            <p>
               {selectedRepo 
                 ? "Enter your question in plain English below, and RepoSage will search and reference files in this codebase." 
                 : "Please select or index a repository in the sidebar to get started."}
@@ -556,8 +539,8 @@ export default function ChatPanel({ selectedRepo, onCitationClick, setCitations 
                 </div>
                 <div className="bubble" style={showLoader ? { padding: "12px 20px" } : null}>
                   {showLoader ? (
-                    <div className="loader-container" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <Loader2 size={16} className="animate-spin" />
+                    <div className="loader-container">
+                      <Loader2 size={15} className="animate-spin" />
                       Retrieving chunks and starting response...
                     </div>
                   ) : (
@@ -594,12 +577,12 @@ export default function ChatPanel({ selectedRepo, onCitationClick, setCitations 
             className="btn-send"
             disabled={isLoading || !selectedRepo || !input.trim()}
           >
-            <Send size={16} />
+            <Send size={15} />
           </button>
         </form>
       </div>
 
-      {/* Neumorphic Failover Modal */}
+      {/* Glassmorphism Failover Modal */}
       {showFailoverModal && (
         <div className="modal-overlay">
           <div className="modal-content">
